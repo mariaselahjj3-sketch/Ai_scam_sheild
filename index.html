@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Scam Shield</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#f4f6fb;margin:0;color:#1b2540}
+main{max-width:560px;margin:32px auto;padding:0 16px}
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 10px #0001;margin-bottom:16px}
+h1{margin:0 0 4px}label{display:block;margin:12px 0 4px;font-weight:600}
+input,textarea{width:100%;box-sizing:border-box;padding:10px;border:1px solid #c9d0e0;border-radius:8px;font:inherit}
+button{padding:11px 16px;border:0;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;margin:12px 8px 0 0;background:#0a3d91;color:#fff}
+button.alt{background:#e3e8f5;color:#1b2540}button:disabled{opacity:.5}
+.score{font-size:42px;font-weight:800}.Safe{color:#1a8f3c}.Suspicious{color:#d98a00}.Danger{color:#c62828}
+.banner{padding:10px;border-radius:8px;font-weight:600;margin-top:12px}
+.ok{background:#e2f6e8}.bad{background:#fde4e4}
+</style></head><body><main>
+<div class="card"><h1>🛡️ AI Scam Shield</h1><div>Check any payment request before you pay with PayPal.</div>
+<label>Who is asking for money?</label><input id="sender" placeholder="e.g. Acme Design Studio">
+<label>Amount (USD)</label><input id="amount" type="number" min="1" placeholder="50">
+<label>Invoice or message text</label><textarea id="message" rows="5" placeholder="Paste the invoice or message here"></textarea>
+<button id="check">Check with Scam Shield</button>
+<button class="alt" id="ex1">Safe example</button><button class="alt" id="ex2">Scam example</button></div>
+<div class="card" id="result" hidden>
+<div class="score" id="score"></div><div id="label" style="font-weight:700"></div>
+<ul id="reasons"></ul><div id="advice"></div><div id="banner" class="banner" hidden></div>
+<button id="pay" hidden>Pay with PayPal (sandbox)</button></div>
+<div class="card" id="done" hidden></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const inv = () => ({ sender: $("sender").value, amount: $("amount").value, message: $("message").value });
+const post = (u, b) => fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) });
+$("ex1").onclick = () => { $("sender").value = "Maya’s Web Studio"; $("amount").value = 50; $("message").value = "Invoice #1042: logo design work agreed on 3 Nov. Thank you for your business!"; };
+$("ex2").onclick = () => { $("sender").value = "PayPal Support Team"; $("amount").value = 480; $("message").value = "URGENT: your account will be suspended within 24 hours. Pay now by gift card or verify your account at http://paypa1-secure.bit.ly"; };
+$("check").onclick = async () => {
+  $("check").disabled = true; $("check").textContent = "Checking...";
+  const d = await (await post("/api/check", inv())).json();
+  $("result").hidden = false; $("score").textContent = d.score + " / 100"; $("score").className = "score " + d.label;
+  $("label").textContent = d.label + " (risk score)"; $("label").className = d.label; $("advice").textContent = d.advice;
+  $("reasons").innerHTML = ""; (d.reasons || []).forEach(r => { const li = document.createElement("li"); li.textContent = r; $("reasons").appendChild(li); });
+  const safe = d.score < 70; $("pay").hidden = !safe; $("banner").hidden = false;
+  $("banner").className = "banner " + (safe ? "ok" : "bad");
+  $("banner").textContent = safe ? "No blocking risk found. You can continue to PayPal." : "Payment blocked: this looks like a scam. Do not pay.";
+  $("check").disabled = false; $("check").textContent = "Check with Scam Shield";
+};
+$("pay").onclick = async () => {
+  $("pay").disabled = true;
+  const r = await post("/api/create-order", inv()); const d = await r.json();
+  if (d.url) location.href = d.url; else { alert(d.blocked ? "Blocked by Scam Shield" : "PayPal error"); $("pay").disabled = false; }
+};
+const orderId = new URLSearchParams(location.search).get("token");
+if (orderId) (async () => {
+  const d = await (await post("/api/capture-order", { orderId })).json();
+  $("done").hidden = false;
+  $("done").textContent = d.status === "COMPLETED" ? `✅ Payment complete: ${d.amount} ${d.currency} (PayPal sandbox order ${d.id})` : "Payment was not completed.";
+  history.replaceState({}, "", "/");
+})();
+</script></body></html>
