@@ -1,0 +1,10 @@
+const express = require("express");
+const path = require("path");
+const app = express();
+app.use(express.json());
+const wrap = fn => (req, res) => fn(req, res).catch(e => { console.error(e); res.status(500).json({ error: "Server error" }); });
+app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
+app.post("/api/check", wrap(require("./api/check")));
+app.post("/api/create-order", wrap(require("./api/create-order")));
+app.post("/api/capture-order", wrap(require("./api/capture-order")));
+app.listen(process.env.PORT || 3000);
